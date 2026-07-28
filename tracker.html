@@ -55,6 +55,12 @@
   .prereq{ max-width:1000px; margin:22px auto -4px; padding:14px 18px; background:#eef5fb; border:1px solid var(--line); border-left:4px solid var(--accent-d); border-radius:10px; font-size:.9rem; color:var(--ink); }
   .prereq b{ color:var(--accent-dd); } .prereq code{ font-family:"SFMono-Regular",Consolas,monospace; font-size:.85em; background:#dcebf7; padding:1px 5px; border-radius:4px; }
   .prereq.bonus{ border-left-color:var(--ok); background:#eef9f0; margin:8px auto 30px; } .prereq.bonus b{ color:var(--ok); } .prereq.bonus code{ background:#d7f0dd; }
+  .deliver, .approach{ margin:4px 0 0 24px; font-size:.93rem; color:var(--ink); }
+  .deliver li, .approach li{ margin:5px 0; line-height:1.5; }
+  .deliver li::marker{ color:var(--ok); } .approach li::marker{ color:var(--accent-dd); font-weight:800; }
+  .watch{ background:#fff8e8; border:1px solid #f0dcb0; border-left:3px solid #d69a1a; border-radius:0 8px 8px 0; padding:9px 14px; margin:14px 0 0; font-size:.9rem; color:#5c4405; }
+  .watch b{ color:#a8730a; }
+  .deliver c, .approach c, .watch c, .validate c{ font-family:"SFMono-Regular",Consolas,monospace; font-size:.88em; background:#e7f1fa; padding:1px 5px; border-radius:4px; color:var(--code-ink); font-style:normal; }
   footer{ text-align:center; color:var(--muted); font-size:.8rem; padding:0 0 40px; }
   .step.finale .s-num{ background:linear-gradient(135deg,#16a34a,#29B5E8); }
 </style>
@@ -84,49 +90,79 @@
 <script>
 const GATES = [
   { n:"1", title:"Find out how bad it is", min:"8 min",
-    achieve:"Two systems have been describing the same prescribers for years and nobody trusts either one. Before fixing anything, quantify the damage. Profile the big raw tables and put real numbers on it \u2014 how many duplicates, nulls, orphaned records and impossible values, and how many different ways is the same country spelled? Then compare the two HCP sources and work out exactly how they disagree. That answer shapes everything you build next.",
+    achieve:"Two systems have been describing the same prescribers for years and nobody trusts either one. Before fixing anything, quantify the damage \u2014 and work out exactly how the two sources disagree. That answer shapes everything you build next.",
+    deliver:["Defect counts per table: duplicates, nulls, orphans, out-of-range values.",
+              "The number of distinct spellings for country, and the tier encodings in use.",
+              "A written statement of how CRM and ERP disagree \u2014 keys, name format, country, tier."],
+    approach:["Give Cortex Code <c>@SNOWCAMP_DATAOPS.RAW</c> and ask for a table inventory with row counts.",
+               "Ask for a count per defect type, per table \u2014 not just examples.",
+               "Put the two HCP sources side by side and sample a few rows of each.",
+               "Work out what it would take to join them at all."],
+    watch:"Aggregate in SQL \u2014 these are millions of rows. And look very closely at the two key formats.",
     skills:["/sql-author","/data-quality"],
-    think:["Point Cortex Code at @SNOWCAMP_DATAOPS.RAW and ask for counts per defect, not just examples.",
-           "Look closely at the two HCP keys \u2014 CRM and ERP don't format them the same way.",
-           "These are millions of rows: aggregate in SQL rather than pulling data down."],
     validate:"State, with numbers, the top defects in each table and exactly how the CRM and ERP sources disagree.",
     gate:"You can quantify the mess and describe how the two sources differ." },
   { n:"2", title:"Build one version of the truth", min:"14 min",
-    achieve:"Downstream teams need a single trustworthy HCP master. Reconcile the two sources into one: normalise the keys so they can be joined at all, unify the country and tier encodings down to a small standard set, and collapse the duplicates using a survivorship rule you can explain \u2014 most recent wins? non-null wins? one source is the record? Land the result in ANALYTICS as your golden master.",
+    achieve:"Downstream teams need a single trustworthy HCP master. Reconcile the two sources into one: make the keys joinable, unify the encodings, and collapse the duplicates using a rule you can defend. Land the result in ANALYTICS as your golden master.",
+    deliver:["A golden HCP master in <c>ANALYTICS</c> with exactly one row per HCP.",
+              "A normalised join key that works across both sources.",
+              "Country and tier each collapsed to a small standard set.",
+              "A survivorship rule you can state in one sentence."],
+    approach:["Normalise the keys on both sides so they can be joined.",
+               "Standardise country and tier into single canonical values.",
+               "Choose a survivorship rule \u2014 most recent wins, non-null wins, one source is the record \u2014 and apply it.",
+               "Verify one row per HCP, and that your standard sets are actually small."],
+    watch:"CRM uses HCP_000123, ERP uses HCP-000123. Decide which source wins on conflicting attributes before you build, not after.",
     skills:["/snowpark-python","/sql-author"],
-    think:["CRM uses HCP_000123, ERP uses HCP-000123 \u2014 normalise before you join.",
-           "Choose your survivorship rule deliberately and be able to justify it. That decision is the whole game.",
-           "Twelve spellings of a handful of countries should end up as a handful of values."],
     validate:"Show one row per HCP, and that country and tier each collapse to a small standard set.",
     gate:"A deduplicated, standardised golden HCP master exists in ANALYTICS." },
   { n:"3", title:"Protect the people in the data", min:"9 min",
-    achieve:"There's real personal data in here \u2014 prescriber names, emails and phone numbers, plus patient names and national IDs. Find it, classify it, and mask it so only you can see raw values. Then prove the mask holds by looking at the data as someone who shouldn't see it. Feeling ambitious? Restrict rows by region too.",
+    achieve:"There's real personal data in here \u2014 prescriber names, emails and phone numbers, plus patient names and national IDs. Find it, classify it, mask it, and then prove the mask holds by looking at the data as someone who shouldn't see it.",
+    deliver:["PII classified or tagged across the HCP and PATIENTS tables.",
+              "Masking policies applied to names, emails, phone numbers and national IDs.",
+              "Proof the mask works, tested from an unprivileged role.",
+              "Optional: a row-access policy restricting rows by region."],
+    approach:["Ask Cortex Code to find and classify the sensitive columns in both tables.",
+               "Describe the masking outcome you want and let it write and apply the policies.",
+               "Test as a role without access, then as yourself, and compare."],
+    watch:"As ACCOUNTADMIN you always see raw values \u2014 test as another role or you've proven nothing.",
     skills:["/data-governance"],
-    think:["Ask it to find the sensitive columns first, then describe the outcome you want and let it write the policy.",
-           "A masking policy you haven't tested is a masking policy you don't have."],
     validate:"Read the PII columns as a role without access, then as yourself, and compare.",
     gate:"PII is classified, masked, and you proved the mask works." },
   { n:"4", title:"Make the quality visible", min:"9 min",
-    achieve:"You know what's broken \u2014 now make Snowflake watch it for you. Attach data metric functions for the specific defects you found in Gate 1 (null and duplicate keys, negative quantities, adherence outside 0-100, orphaned patients) and run them, so those numbers become monitored metrics instead of a query you ran once and forgot.",
+    achieve:"You know what's broken \u2014 now make Snowflake watch it for you, so those numbers become monitored metrics instead of a query you ran once and forgot.",
+    deliver:["Data metric functions attached to the relevant RAW tables \u2014 one per defect you found.",
+              "Results showing counts that line up with your Gate 1 profiling.",
+              "Optional: a schedule so they keep reporting."],
+    approach:["List the defects from Gate 1 and choose a metric for each.",
+               "Attach the DMFs to the right tables and columns.",
+               "Run them and compare the results against your Gate 1 numbers."],
+    watch:"If a DMF disagrees with your Gate 1 profiling, one of the two is measuring the wrong thing \u2014 find out which.",
     skills:["/data-quality"],
-    think:["One check per defect you actually found \u2014 the counts should line up with your Gate 1 profiling.",
-           "If you have time, schedule them so they keep reporting."],
     validate:"Run your DMFs and show they return counts matching what you profiled.",
     gate:"Quality is monitored by DMFs returning real defect counts." },
   { n:"5", title:"Keep it fresh without babysitting", min:"12 min",
-    achieve:"A clean table that goes stale is just a slower version of the problem. Build a pipeline that keeps a curated commercial mart current on its own \u2014 prescriptions joined to your golden master and territory data, refreshing on a target lag with dynamic tables. Then confirm you can trace exactly where the mart's data came from.",
+    achieve:"A clean table that goes stale is just a slower version of the problem. Build a pipeline that keeps a curated commercial mart current on its own, then confirm you can trace exactly where its data came from.",
+    deliver:["One or more dynamic tables producing a curated commercial mart.",
+              "A target lag set, and evidence of an actual refresh.",
+              "Lineage showing the mart deriving from RAW plus your golden master."],
+    approach:["Define the mart you want \u2014 prescriptions joined to your golden master and territory data.",
+               "Build it as a dynamic table with a target lag.",
+               "Confirm it actually refreshes rather than assuming it will.",
+               "Trace the lineage back to its sources."],
+    watch:"Feed the pipeline your cleaned and golden objects. A pipeline built over raw mess just automates the mess.",
     skills:["/dynamic-tables","/lineage","/snowflake-tasks"],
-    think:["Set a target lag and confirm it actually refreshes \u2014 don't just create it and assume.",
-           "Ask where the mart comes from; lineage should show RAW plus your golden master.",
-           "This is the difference between a clean-up and a data product."],
     validate:"Show your dynamic table(s) refreshing, and the mart's lineage back to its sources.",
     gate:"A fresh curated mart with a working pipeline and verified lineage." },
   { n:"F", title:"Show that it's trustworthy", min:"8 min", dom:"final gate", finale:true,
-    achieve:"Trust is easier to believe when you can see it. Ship a Streamlit app on the container runtime (SPCS): either a focused results view \u2014 a data quality scorecard with your defect counts plus the mart's freshness and row counts \u2014 or a fuller stewardship console where someone can drill into the problem records. Deploy it and open the URL.",
+    achieve:"Trust is easier to believe when you can see it. Ship a Streamlit app on the container runtime (SPCS) that makes the state of your data obvious at a glance.",
+    deliver:["A Streamlit app on the container runtime with a working URL.",
+              "A quality scorecard \u2014 defect counts plus the mart's freshness and row counts \u2014 or a fuller stewardship console with drill-downs."],
+    approach:["Decide what a data steward would need to see first.",
+               "Describe it and let Cortex Code build the app over your DMF results and curated mart.",
+               "Deploy on the container runtime, open the URL, then improve one thing."],
+    watch:"Deploy with RUNTIME_NAME='SYSTEM$ST_CONTAINER_RUNTIME_PY3_11', COMPUTE_POOL=SNOWCAMP_DATAOPS_POOL, QUERY_WAREHOUSE=SNOWCAMP_DATAOPS_WH.",
     skills:["/developing-with-streamlit-in-snowflake"],
-    think:["Container runtime: RUNTIME_NAME='SYSTEM$ST_CONTAINER_RUNTIME_PY3_11', COMPUTE_POOL=SNOWCAMP_DATAOPS_POOL, QUERY_WAREHOUSE=SNOWCAMP_DATAOPS_WH.",
-           "Picture a data steward opening this on Monday \u2014 what should they see first?",
-           "First launch may lag while the compute pool starts."],
     validate:"Open the app and confirm the quality/mart view renders.",
     gate:"App is live on the container runtime showing the quality and mart state." },
 ];
@@ -154,10 +190,14 @@ function render(){
       </div>
       <div class="s-body">
         <div class="goalbox"><b>Your task:</b> ${g.achieve}</div>
+        <div class="label">Deliverable — what "done" looks like</div>
+        <ul class="deliver">${g.deliver.map(d=>`<li>${d}</li>`).join("")}</ul>
+        <div class="label">How to approach it — your prompts, your call</div>
+        <ol class="approach">${g.approach.map(a=>`<li>${a}</li>`).join("")}</ol>
+        ${g.watch?`<div class="watch"><b>Watch out:</b> ${g.watch}</div>`:""}
         <div class="label">Skills that help</div>
         <div class="skills">${g.skills.map(s=>`<span class="s">${s}</span>`).join("")}</div>
-        <div class="label">Think</div>${g.think.map(t=>`<div class="think">${t}</div>`).join("")}
-        <div class="label">Validate — check yourself</div>
+        <div class="label">Check yourself</div>
         <div class="validate"><b>Try:</b> ${g.validate}</div>
         <div class="gate"><b>Gate:</b> ${g.gate}</div>
         <div class="actions">
