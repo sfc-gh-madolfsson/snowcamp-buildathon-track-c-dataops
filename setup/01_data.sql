@@ -18,41 +18,19 @@
    All objects FULLY QUALIFIED. LARGE gen warehouse, dropped at the end.
    ===================================================================== */
 
-USE ROLE ACCOUNTADMIN;   -- or your admin-like role
+USE ROLE ACCOUNTADMIN;
 
-------------------------------------------------------------------------
--- 1. Database + schemas FIRST. Nothing below can block them, so the
---    data build cannot fail with "database does not exist".
-------------------------------------------------------------------------
-CREATE DATABASE IF NOT EXISTS SNOWCAMP_DATAOPS;
-CREATE SCHEMA   IF NOT EXISTS SNOWCAMP_DATAOPS.RAW;
-CREATE SCHEMA   IF NOT EXISTS SNOWCAMP_DATAOPS.ANALYTICS;
-CREATE SCHEMA   IF NOT EXISTS SNOWCAMP_DATAOPS.APP;
-
-------------------------------------------------------------------------
--- 2. One warehouse for generation and for the lab. Tries MEDIUM, falls
---    back to XSMALL if the account caps warehouse size, so a size limit
---    can never abort the script.
-------------------------------------------------------------------------
-EXECUTE IMMEDIATE $$
-BEGIN
-  CREATE WAREHOUSE IF NOT EXISTS SNOWCAMP_DATAOPS_WH WAREHOUSE_SIZE = 'MEDIUM'
-    AUTO_SUSPEND = 60 AUTO_RESUME = TRUE INITIALLY_SUSPENDED = FALSE;
-  RETURN 'warehouse SNOWCAMP_DATAOPS_WH ready (MEDIUM)';
-EXCEPTION WHEN OTHER THEN
-  BEGIN
-    CREATE WAREHOUSE IF NOT EXISTS SNOWCAMP_DATAOPS_WH WAREHOUSE_SIZE = 'XSMALL'
-      AUTO_SUSPEND = 60 AUTO_RESUME = TRUE INITIALLY_SUSPENDED = FALSE;
-    RETURN 'warehouse SNOWCAMP_DATAOPS_WH ready (XSMALL fallback)';
-  EXCEPTION WHEN OTHER THEN
-    RETURN 'could not create SNOWCAMP_DATAOPS_WH: ' || SQLERRM;
-  END;
-END;
-$$;
-
+-- Environment: warehouse, database, schemas. Plain SQL, runs top to bottom.
+CREATE WAREHOUSE IF NOT EXISTS SNOWCAMP_DATAOPS_WH
+  WAREHOUSE_SIZE = 'XSMALL' AUTO_SUSPEND = 120 AUTO_RESUME = TRUE INITIALLY_SUSPENDED = FALSE;
 USE WAREHOUSE SNOWCAMP_DATAOPS_WH;
-USE DATABASE  SNOWCAMP_DATAOPS;
-USE SCHEMA    SNOWCAMP_DATAOPS.RAW;
+
+CREATE DATABASE IF NOT EXISTS SNOWCAMP_DATAOPS;
+USE DATABASE SNOWCAMP_DATAOPS;
+CREATE SCHEMA IF NOT EXISTS SNOWCAMP_DATAOPS.RAW;
+CREATE SCHEMA IF NOT EXISTS SNOWCAMP_DATAOPS.ANALYTICS;
+CREATE SCHEMA IF NOT EXISTS SNOWCAMP_DATAOPS.APP;
+USE SCHEMA SNOWCAMP_DATAOPS.RAW;
 
 /* ===================== SOURCE 1: CRM (65k + 15k dup = 80k) =====================
    INCONSISTENCY: ~3% null names; 15k duplicate HCP_IDs; country + tier drift; PII */
